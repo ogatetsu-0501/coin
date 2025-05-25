@@ -7,6 +7,7 @@ import keyboard                     # キーボード入力検知用ライブラ
 import pytesseract                  # OCR（文字認識）用ライブラリ
 import pydirectinput                # ゲーム向けキー入力送信用ライブラリ
 import concurrent.futures           # 並列処理用ライブラリ
+import os                           # ファイル・ディレクトリ操作用ライブラリ
 
 # pytesseract の設定：数字のみ認識する
 tess_config = "--psm 7 -c tessedit_char_whitelist=0123456789"
@@ -20,6 +21,7 @@ if template is None:
 
 # 起動時にテンプレート画像にOCRをかけ、その結果をグローバル変数に保存
 def get_template_text():
+    # 小学生にもわかるコメント：テンプレートを白黒にして文字を読む準備をするよ
     t_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     ret, t_binary = cv2.threshold(t_gray, 144, 255, cv2.THRESH_BINARY)
     return pytesseract.image_to_string(t_binary, config=tess_config).strip()
@@ -29,6 +31,7 @@ print(f"起動時のテンプレート画像のOCR結果: '{template_text}'")
 
 # OCR を並列処理するための関数
 def ocr_region(region):
+    # 小学生にもわかるコメント：領域画像を白黒にして文字を読み込むよ
     region_gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
     ret, region_binary = cv2.threshold(region_gray, 144, 255, cv2.THRESH_BINARY)
     return pytesseract.image_to_string(region_binary, config=tess_config).strip()
@@ -36,7 +39,7 @@ def ocr_region(region):
 # ---------- 対象ウインドウの登録 ----------
 print("【対象ウインドウ登録】対象ウインドウ上でAキーを押してください。")
 keyboard.wait("a")                 # ユーザーがAキーを押すまで待機
-x, y = pyautogui.position()          # Aキー押下時のマウス位置取得
+x, y = pyautogui.position()        # Aキー押下時のマウス位置取得
 target_window = None
 for win in gw.getAllWindows():
     if win.left <= x <= win.left + win.width and win.top <= y <= win.top + win.height:
@@ -50,6 +53,43 @@ print("対象ウインドウが決定されました:", target_window.title)
 # OCR対象の4箇所の座標（スクリーンショット内での相対座標）
 positions = [(677,228), (677,299), (677,370), (677,440)]
 temp_h, temp_w = template.shape[:2]
+
+# ────────── ここから追加部分：Bキーで領域画像を保存 ──────────
+
+# Bキーが押されたとき、その時点の4領域を保存する関数
+def on_b_press(event):
+    time.sleep(0.1)  # 小学生にもわかるコメント：ちょっと待つよ
+
+    # ウインドウ位置とサイズを取得
+    left = target_window.left
+    top = target_window.top
+    width = target_window.width
+    height = target_window.height
+
+    # 対象ウインドウ全体のスクリーンショットを取得
+    screenshot = pyautogui.screenshot(region=(left, top, width, height))
+    screenshot = np.array(screenshot)
+    screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
+
+    # 画像保存用ディレクトリを作成
+    save_dir = "captured_regions"
+    os.makedirs(save_dir, exist_ok=True)
+
+    # 各座標の領域を切り出して保存
+    for idx, (px, py) in enumerate(positions, start=1):
+        if px + temp_w > width or py + temp_h > height:
+            print(f"領域{idx}がウインドウ外です、スキップします。")
+            continue
+        region = screenshot[py:py+temp_h, px:px+temp_w]
+        filename = os.path.join(save_dir, f"region_{idx}_{int(time.time())}.png")
+        cv2.imwrite(filename, region)
+        print(f"領域{idx}を保存しました：{filename}")
+
+# Bキー押下で on_b_press を呼び出す設定
+keyboard.on_press_key('b', on_b_press)
+print("Bキーで指定4領域の画像を保存できます。")
+
+# ────────── 追加部分ここまで ──────────
 
 # ---------- Rキー押下時の処理 ----------
 def on_r_press(event):
