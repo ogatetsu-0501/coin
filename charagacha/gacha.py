@@ -14,7 +14,7 @@ import sys                          # プログラム終了用
 # OCR設定
 # ────────────────────────────────────────
 # 小学生にもわかるコメント：数字だけ読む設定だよ
-tess_config = "--psm 7 -c tessedit_char_whitelist=0123456789"
+tess_config     = "--psm 7 -c tessedit_char_whitelist=0123456789"
 # 小学生にもわかるコメント：日本語も読む設定だよ
 tess_config_jpn = "--psm 7 -l jpn"
 
@@ -26,45 +26,46 @@ template = cv2.imread(template_path, cv2.IMREAD_COLOR)
 if template is None:
     print(f"テンプレート画像が見つかりません: {template_path}")
     sys.exit()
+temp_h, temp_w = template.shape[:2]
 
 # ────────────────────────────────────────
-# 起動時にテンプレート画像にOCRをかけ、その結果を保存
+# 起動時に image.png にOCRをかけ、その結果を保存
 # ────────────────────────────────────────
 def get_template_text():
     # 小学生にもわかるコメント：テンプレートを白黒にして文字を読む準備をするよ
-    t_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-    _, t_binary = cv2.threshold(t_gray, 144, 255, cv2.THRESH_BINARY)
-    return pytesseract.image_to_string(t_binary, config=tess_config).strip()
+    gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 144, 255, cv2.THRESH_BINARY)
+    return pytesseract.image_to_string(binary, config=tess_config).strip()
 
 template_text = get_template_text()
 print(f"起動時のテンプレート画像のOCR結果: '{template_text}'")
 
 # ────────────────────────────────────────
-# 追加：11.png をもうひとつのテンプレートとして読み込む
+# 追加：12.png をもうひとつのテンプレートとして読み込む
 # ────────────────────────────────────────
-jpn_template_path = os.path.join("charagacha", "11.png")  # 相対パス指定
+jpn_template_path = os.path.join("charagacha", "12.png")  # 相対パス指定
 jpn_template = cv2.imread(jpn_template_path, cv2.IMREAD_COLOR)
 if jpn_template is None:
-    print(f"11.png が見つかりません: {jpn_template_path}")
+    print(f"12.png が見つかりません: {jpn_template_path}")
     sys.exit()
 
 def get_jpn_template_text():
-    # 小学生にもわかるコメント：11.pngを白黒にして文字を読む準備をするよ
+    # 小学生にもわかるコメント：12.pngを白黒にして文字を読む準備をするよ
     gray = cv2.cvtColor(jpn_template, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 144, 255, cv2.THRESH_BINARY)
     return pytesseract.image_to_string(binary, config=tess_config_jpn).strip()
 
 jpn_template_text = get_jpn_template_text()
-print(f"起動時の11.pngのOCR結果: '{jpn_template_text}'")
+print(f"起動時の12.pngのOCR結果: '{jpn_template_text}'")
 
 # ────────────────────────────────────────
 # OCR を並列処理するための関数
 # ────────────────────────────────────────
 def ocr_region(region):
     # 小学生にもわかるコメント：領域画像を白黒にして文字を読み込むよ
-    region_gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
-    _, region_binary = cv2.threshold(region_gray, 144, 255, cv2.THRESH_BINARY)
-    return pytesseract.image_to_string(region_binary, config=tess_config).strip()
+    gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 144, 255, cv2.THRESH_BINARY)
+    return pytesseract.image_to_string(binary, config=tess_config).strip()
 
 # ────────────────────────────────────────
 # 最終クリックカウンタ
@@ -92,7 +93,6 @@ print("対象ウインドウが決定されました:", target_window.title)
 
 # OCR対象の4箇所の座標（スクリーンショット内での相対座標）
 positions = [(677,228), (677,299), (677,370), (677,440)]
-temp_h, temp_w = template.shape[:2]
 
 # ────────── Bキーで領域画像を保存 ──────────
 def on_b_press(event):
@@ -159,43 +159,52 @@ def on_r_press(event):
             cy = top  + py + temp_h // 2
             pydirectinput.click(x=cx, y=cy)
             time.sleep(0.1)
-
+            # 小学生にもわかるコメント：クリックしたあとはマウスを右下に移動するよ
+            screen_w, screen_h = pyautogui.size()
+            pyautogui.moveTo(screen_w - 1, screen_h - 1)
+            time.sleep(0.1)
             # ── クリック後に再度スクリーンショット ──
             updated = pyautogui.screenshot(region=(left, top, width, height))
             updated = cv2.cvtColor(np.array(updated), cv2.COLOR_RGB2BGR)
 
-            # ── OCR 切り出し領域 ──
-            # 小学生にもわかるコメント：ここで日本語の部分を切り取るよ
-            ox, oy, ow, oh = 889, 395, 72, 14
-            rel_x = ox - left
-            rel_y = oy - top
-            ocr_img = updated[rel_y:rel_y+oh, rel_x:rel_x+ow]
+            # ── 追加：通常モードOCR領域保存 ──
+            # 小学生にもわかるコメント：ここで日本語部分を切り出して保存するよ
+            ox, oy, ow, oh = 895, 394, 72, 14
+            # ウインドウ内スクショ基準だからそのまま使う
+            ocr_img = updated[oy:oy+oh, ox:ox+ow]
+            save_dir = "normal_mode_ocr"
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, f"ocr_{int(time.time()*1000)}.png")
+            cv2.imwrite(save_path, ocr_img)
+            print(f"通常モードOCR領域を保存しました：{save_path}")
+            # ── 追加ここまで ──
 
             # ── 日本語OCRを実行 ──
             ocr_text = pytesseract.image_to_string(ocr_img, config=tess_config_jpn).strip()
-            print(f"11.png比較用OCR結果: '{ocr_text}'")
+            print(f"12.png比較用OCR結果: '{ocr_text}'")
 
             if ocr_text == jpn_template_text:
                 # ── 最終クリックを実行 ──
-                pydirectinput.click(x=1131, y=613)
+                pydirectinput.click(x=1151, y=624)
+                pydirectinput.click(x=1151, y=624)
                 time.sleep(0.3)
 
                 # ── クリック回数を増やしてチェック ──
                 final_click_count += 1  # 小学生にもわかるコメント：カウントをひとつ増やすよ
                 print(f"最終クリック回数: {final_click_count} / 30")
 
-                if final_click_count >= 30:
-                    print("最終クリックを30回行ったのでプログラムを終了します。")
+                if final_click_count >= 3:
+                    print("最終クリックを3回行ったのでプログラムを終了します。")
                     sys.exit()  # 小学生にもわかるコメント：ここでプログラムを終わらせるよ
 
-                break  # forループ抜けて処理終了
+                break  # for ループ抜け
 
             else:
-                # ── 一致しなければ Rキー再送信 ──
+                # 一致しなければ Rキー再送信
                 pydirectinput.press('r')
                 return
 
-    # ── OCR一致しなかったときも Rキー再送信 ──
+    # OCR一致しなかったときも Rキー再送信
     pydirectinput.press('r')
 
 keyboard.on_press_key('r', on_r_press)
@@ -203,7 +212,7 @@ keyboard.on_press_key('r', on_r_press)
 print("Rキー（または自動送信）によりOCR処理が実行されます。")
 print("テンプレート画像のOCR結果は起動時に1回のみ実行されます。")
 print("指定領域でOCR結果が一致（または4/8とみなす）すればクリック処理が行われます。")
-print("11.pngの日本語OCR結果とも比較して、合致する場合に最終クリックを実行します。")
+print("12.pngの日本語OCR結果とも比較して、合致する場合に最終クリックを実行します。")
 print("最終クリックを30回行ったらプログラムを終了します。")
 print("プログラム終了はCtrl+CでもOKです。")
 
